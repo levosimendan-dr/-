@@ -5,11 +5,16 @@ import joblib
 import shap
 import matplotlib.pyplot as plt
 
-# ================= 修复配置 =================
-# 1. 设置字体（解决中文乱码）
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial']
-# 2. 解决负号显示为方框的问题（这一行必须设为 False）
+import matplotlib.pyplot as plt
+
+# ================= 强力修复中文与负号 =================
+# 1. 强制指定字体族
+plt.rcParams['font.family'] = 'sans-serif'
+# 2. 优先使用微软雅黑，如果找不到再用黑体
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'SimSun', 'Arial']
+# 3. 解决负号显示为方框的问题
 plt.rcParams['axes.unicode_minus'] = False
+# ==========================
 # ===========================================
 st.set_page_config(page_title="HFpEF合并CKD再入院风险预测", layout="wide")
 
