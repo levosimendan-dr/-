@@ -4,55 +4,36 @@ import numpy as np
 import joblib
 import shap
 import matplotlib.pyplot as plt
-import os
-import matplotlib.font_manager as fm  # <--- 新增这行
-# ========================================================
-# 【核弹级修复】直接读取 Windows 本地字体文件
-# ========================================================
-# 1. 定义字体路径 (Windows 默认黑体路径)
-font_path = "C:/Windows/Fonts/simhei.ttf"
 
-# 2. 如果黑体找不到，试试微软雅黑
-if not os.path.exists(font_path):
-    font_path = "C:/Windows/Fonts/msyh.ttf"
+# ==========================================
+# 1. Configuration (Standard English)
+# ==========================================
+st.set_page_config(page_title="HFpEF w/ CKD Risk Calculator", layout="wide")
 
-# 3. 强制加载该字体文件
-if os.path.exists(font_path):
-    # 将字体文件加入 matplotlib 的管理器
-    fm.fontManager.addfont(font_path)
-    # 获取该字体的内部名称
-    custom_font = fm.FontProperties(fname=font_path)
-    # 设为全局默认字体
-    plt.rcParams['font.family'] = custom_font.get_name()
-    plt.rcParams['axes.unicode_minus'] = False # 解决负号
-    print(f"✅ 已强制加载中文字体: {font_path}")
-else:
-    st.error("⚠️ 未在系统中找到 simhei.ttf 或 msyh.ttf，中文可能无法显示。")
-# ========================================================
-# ===========================================
-st.set_page_config(page_title="HFpEF合并CKD再入院风险预测", layout="wide")
+# Set font to standard sans-serif (No more Chinese font issues)
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['axes.unicode_minus'] = False  # Ensure minus signs display correctly
 
-# 变量名映射 (中文显示 -> 英文特征名)
-# 顺序基于你的 SHAP 图重要性排序
+# English Name Mapping
 NAME_MAPPING = {
-    "egfr": "eGFR (mL/min/1.73m2)",
-    "E_over_e_prime": "E/e' (左室充盈压)",
-    "d_dimer": "D-二聚体 (mg/L)",
-    "serum_creatinine": "血肌酐 (μmol/L)",
-    "nyha_class": "NYHA 心功能分级",
-    "serum_uric_acid": "血尿酸 (μmol/L)",
-    "blood_urea_nitrogen": "尿素氮 (mmol/L)",
+    "egfr": "eGFR (mL/min/1.73m2)",  # Used 'm2' to avoid unicode issues
+    "E_over_e_prime": "E/e' Ratio",
+    "d_dimer": "D-Dimer (mg/L)",
+    "serum_creatinine": "Serum Creatinine (umol/L)",
+    "nyha_class": "NYHA Class",
+    "serum_uric_acid": "Uric Acid (umol/L)",
+    "blood_urea_nitrogen": "BUN (mmol/L)",
     "nt_probnp": "NT-proBNP (pg/mL)",
-    "homocysteine": "同型半胱氨酸 (μmol/L)",
+    "homocysteine": "Homocysteine (umol/L)",
     "hs_crp": "hs-CRP (mg/L)"
 }
 
-# 反向映射用于查找
+# Reverse mapping for lookups
 REVERSE_MAPPING = {v: k for k, v in NAME_MAPPING.items()}
 
 
 # ==========================================
-# 2. 加载资源
+# 2. Load Resources
 # ==========================================
 @st.cache_resource
 def load_resources():
@@ -62,24 +43,24 @@ def load_resources():
         feature_names = joblib.load('feature_names.pkl')
         return model, background_data, feature_names
     except FileNotFoundError:
-        st.error("⚠️ 未找到模型文件！请确保 final_model.pkl, train_data_sample.pkl, feature_names.pkl 在当前目录下。")
+        st.error(
+            "Error: Model files not found. Please ensure 'final_model.pkl', 'train_data_sample.pkl', and 'feature_names.pkl' are in the directory.")
         return None, None, None
 
 
 model, X_train_bg, model_features = load_resources()
 
 # ==========================================
-# 3. 侧边栏：患者数据输入
+# 3. Sidebar: Patient Data Input
 # ==========================================
-st.sidebar.header("🏥 患者临床指标输入")
+st.sidebar.header("🏥 Patient Data Input")
 
 input_dict = {}
 
 if model_features:
-    # 动态生成输入框，确保顺序正确
-    # 这里我们手动按照 SHAP 重要性分组展示，体验更好
+    # Use English labels for inputs
 
-    st.sidebar.subheader("核心肾脏指标")
+    st.sidebar.subheader("Renal Function")
     input_dict['egfr'] = st.sidebar.number_input(NAME_MAPPING['egfr'], min_value=5.0, max_value=150.0, value=30.0,
                                                  step=1.0)
     input_dict['serum_creatinine'] = st.sidebar.number_input(NAME_MAPPING['serum_creatinine'], min_value=20.0,
@@ -87,14 +68,14 @@ if model_features:
     input_dict['blood_urea_nitrogen'] = st.sidebar.number_input(NAME_MAPPING['blood_urea_nitrogen'], min_value=1.0,
                                                                 max_value=50.0, value=10.0)
 
-    st.sidebar.subheader("核心心脏指标")
+    st.sidebar.subheader("Cardiac Function")
     input_dict['E_over_e_prime'] = st.sidebar.number_input(NAME_MAPPING['E_over_e_prime'], min_value=1.0,
                                                            max_value=50.0, value=15.0)
     input_dict['nt_probnp'] = st.sidebar.number_input(NAME_MAPPING['nt_probnp'], min_value=10.0, max_value=35000.0,
                                                       value=2000.0, step=100.0)
     input_dict['nyha_class'] = st.sidebar.selectbox(NAME_MAPPING['nyha_class'], options=[1, 2, 3, 4], index=2)
 
-    st.sidebar.subheader("生物标志物")
+    st.sidebar.subheader("Biomarkers")
     input_dict['d_dimer'] = st.sidebar.number_input(NAME_MAPPING['d_dimer'], min_value=0.0, max_value=20.0, value=0.5,
                                                     step=0.1)
     input_dict['serum_uric_acid'] = st.sidebar.number_input(NAME_MAPPING['serum_uric_acid'], min_value=50.0,
@@ -104,99 +85,94 @@ if model_features:
     input_dict['hs_crp'] = st.sidebar.number_input(NAME_MAPPING['hs_crp'], min_value=0.0, max_value=200.0, value=5.0)
 
 # ==========================================
-# 4. 主界面：预测与解释
+# 4. Main Interface
 # ==========================================
-st.title("❤️ HFpEF合并CKD再入院风险智能评估系统")
-st.markdown("基于 Logistic Regression 与 SHAP 可解释性算法")
+st.title("❤️ Readmission Risk Calculator")
+st.markdown("**Target Population:** HFpEF patients with comorbid CKD")
+st.markdown("---")
 
-if st.button("🚀 开始评估", type="primary"):
+if st.button("🚀 Calculate Risk", type="primary"):
     if model is None:
         st.stop()
 
-    # 1. 构建输入 DataFrame (确保列顺序与训练时一致)
+    # 1. Prepare Input Data
     input_df = pd.DataFrame([input_dict])
-    # 确保只包含模型需要的列，且顺序一致
-    input_df = input_df[model_features]
+    input_df = input_df[model_features]  # Ensure correct column order
 
-    # 2. 模型预测
-    # 注意：你的模型可能是 CalibratedClassifierCV，需要用 predict_proba
+    # 2. Prediction
     try:
         prob = model.predict_proba(input_df)[:, 1][0]
     except:
-        st.error("模型结构异常，无法调用 predict_proba")
+        st.error("Model prediction failed. Please check input data.")
         st.stop()
 
-    # 3. 显示结果
-    col1, col2 = st.columns([1, 2])
+    # 3. Display Results
+    col1, col2 = st.columns([1, 1.5])
 
     with col1:
-        st.subheader("预测结果")
+        st.subheader("Prediction Result")
         risk_percentage = prob * 100
 
-        # 动态颜色
+        # Dynamic Color Logic
         if risk_percentage < 30:
-            color = "green"
-            level = "低风险"
+            color = "#28a745"  # Green
+            level = "Low Risk"
         elif risk_percentage < 70:
-            color = "orange"
-            level = "中风险 (灰色地带)"
+            color = "#ffc107"  # Orange/Yellow
+            level = "Intermediate Risk"
         else:
-            color = "red"
-            level = "高风险"
+            color = "#dc3545"  # Red
+            level = "High Risk"
 
         st.markdown(f"""
-        <div style="text-align: center; border: 2px solid {color}; padding: 20px; border-radius: 10px;">
-            <h1 style="color: {color}; font-size: 50px;">{risk_percentage:.1f}%</h1>
-            <h3>{level}</h3>
+        <div style="text-align: center; border: 3px solid {color}; padding: 25px; border-radius: 15px; background-color: #f8f9fa;">
+            <h4 style="color: #6c757d; margin: 0;">1-Year Readmission Probability</h4>
+            <h1 style="color: {color}; font-size: 60px; margin: 10px 0;">{risk_percentage:.1f}%</h1>
+            <h3 style="color: {color}; margin: 0;">{level}</h3>
         </div>
         """, unsafe_allow_html=True)
-        st.info("注：该概率指患者在出院后1年内发生因心衰再入院的可能性。")
 
     with col2:
-        st.subheader("风险归因分析 (SHAP)")
-        with st.spinner("正在计算特征贡献度..."):
-            # SHAP 计算逻辑
-            # 需要从 CalibratedClassifierCV 或 Pipeline 中提取核心 LR 模型
+        st.subheader("Risk Attribution (SHAP Waterfall)")
+        with st.spinner("Analyzing feature contributions..."):
+            # SHAP Calculation Logic
             estimator = model
             if hasattr(estimator, 'calibrated_classifiers_'):
                 estimator = estimator.calibrated_classifiers_[0].estimator
+
             if hasattr(estimator, 'named_steps'):
-                # 如果是 Pipeline，我们需要取出 Step 里的 Model
-                # 并且我们需要先对数据进行 Pipeline 前半部分的预处理 (Scaler)
                 scaler = estimator.named_steps['scaler']
                 clf = estimator.named_steps['clf']
-
-                # 预处理背景数据和输入数据
                 X_bg_scaled = scaler.transform(X_train_bg)
                 X_input_scaled = scaler.transform(input_df)
-
-                # 创建解释器 (针对 LR 后的线性部分)
                 explainer = shap.LinearExplainer(clf, X_bg_scaled, feature_perturbation="interventional")
                 shap_values = explainer(X_input_scaled)
-
             else:
-                # 如果没有 Pipeline 直接是模型
                 explainer = shap.LinearExplainer(estimator, X_train_bg, feature_perturbation="interventional")
                 shap_values = explainer(input_df)
 
-            # 修正 SHAP 对象的 feature_names 为中文，方便展示
+            # Assign English names to SHAP values
             shap_values.feature_names = [NAME_MAPPING.get(c, c) for c in model_features]
 
-            # 绘制瀑布图
-            fig, ax = plt.subplots(figsize=(8, 6))
+            # Plotting Waterfall
+            # Use bbox_inches='tight' and larger figure size
+            fig = plt.figure(figsize=(10, 6))
             shap.plots.waterfall(shap_values[0], max_display=10, show=False)
-            st.pyplot(fig)
+            plt.tight_layout()
 
-    # 文字解释
+            st.pyplot(fig, use_container_width=False)
+
+    # AI Interpretation Text
     st.markdown("---")
-    st.subheader("🤖 AI 分析报告")
+    st.subheader("🤖 Interpretation")
     top_feature_idx = np.argmax(np.abs(shap_values.values[0]))
     top_feature_name = shap_values.feature_names[top_feature_idx]
     contribution = shap_values.values[0][top_feature_idx]
-    direction = "增加" if contribution > 0 else "降低"
 
-    st.write(f"根据模型分析，对该患者风险影响最大的因素是 **{top_feature_name}**，"
-             f"它使再入院概率**{direction}**了 **{abs(contribution) * 100:.1f}%**。")
+    direction = "increased" if contribution > 0 else "decreased"
+
+    st.info(f"Analysis indicates that **{top_feature_name}** is the most influential factor for this patient, "
+            f"which **{direction}** the risk probability by approximately **{abs(contribution) * 100:.1f}%**.")
 
 else:
-    st.info("👈 请在左侧侧边栏输入患者指标，然后点击“开始评估”。")
+    st.info("👈 Please enter clinical parameters in the sidebar and click 'Calculate Risk'.")
