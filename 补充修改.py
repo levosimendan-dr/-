@@ -4,17 +4,31 @@ import numpy as np
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import os
+import matplotlib.font_manager as fm  # <--- 新增这行
+# ========================================================
+# 【核弹级修复】直接读取 Windows 本地字体文件
+# ========================================================
+# 1. 定义字体路径 (Windows 默认黑体路径)
+font_path = "C:/Windows/Fonts/simhei.ttf"
 
-import matplotlib.pyplot as plt
+# 2. 如果黑体找不到，试试微软雅黑
+if not os.path.exists(font_path):
+    font_path = "C:/Windows/Fonts/msyh.ttf"
 
-# ================= 强力修复中文与负号 =================
-# 1. 强制指定字体族
-plt.rcParams['font.family'] = 'sans-serif'
-# 2. 优先使用微软雅黑，如果找不到再用黑体
-plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'SimSun', 'Arial']
-# 3. 解决负号显示为方框的问题
-plt.rcParams['axes.unicode_minus'] = False
-# ==========================
+# 3. 强制加载该字体文件
+if os.path.exists(font_path):
+    # 将字体文件加入 matplotlib 的管理器
+    fm.fontManager.addfont(font_path)
+    # 获取该字体的内部名称
+    custom_font = fm.FontProperties(fname=font_path)
+    # 设为全局默认字体
+    plt.rcParams['font.family'] = custom_font.get_name()
+    plt.rcParams['axes.unicode_minus'] = False # 解决负号
+    print(f"✅ 已强制加载中文字体: {font_path}")
+else:
+    st.error("⚠️ 未在系统中找到 simhei.ttf 或 msyh.ttf，中文可能无法显示。")
+# ========================================================
 # ===========================================
 st.set_page_config(page_title="HFpEF合并CKD再入院风险预测", layout="wide")
 
